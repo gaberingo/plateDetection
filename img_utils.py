@@ -4,9 +4,6 @@ import numpy as np
 # Initialize the OCR reader
 reader = easyocr.Reader(['id'], gpu=False)
 
-# Plate number format regex
-# regex = r"^(?:([A-Z]{1,2})(\d{1,4}))([A-Z]{1,2})$"
-
 def get_truck_id(license_plate, truck_ids):
     """Mengambil ID truk berdasarkan koordinat plat nomor
 
@@ -38,6 +35,7 @@ def read_plate_text(plate_crop):
     
     detections = reader.readtext(plate_crop)
     for detection in detections:
+        print(detection)
         _, text, confidence = detection
         
         text = text.upper().replace(' ', '')
@@ -82,16 +80,23 @@ def write_csv(results, output_path):
                             )
         f.close()
         
-# Noise Reduction
-def noise_removal(image):
-    kernel = np.ones((1, 1), np.uint8)
-    image = cv2.dilate(image, kernel, iterations=1)
-    kernel = np.ones((1, 1), np.uint8)
-    image = cv2.erode(image, kernel, iterations=1)
-    image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
-    image = cv2.medianBlur(image, 3)
-    return (image)
+def draw_border(img, top_left, bottom_right, color=(0, 255, 0), thickness=10, line_length_x=200, line_length_y=200):
+    x1, y1 = top_left
+    x2, y2 = bottom_right
 
+    cv2.line(img, (x1, y1), (x1, y1 + line_length_y), color, thickness)  #-- top-left
+    cv2.line(img, (x1, y1), (x1 + line_length_x, y1), color, thickness)
+
+    cv2.line(img, (x1, y2), (x1, y2 - line_length_y), color, thickness)  #-- bottom-left
+    cv2.line(img, (x1, y2), (x1 + line_length_x, y2), color, thickness)
+
+    cv2.line(img, (x2, y1), (x2 - line_length_x, y1), color, thickness)  #-- top-right
+    cv2.line(img, (x2, y1), (x2, y1 + line_length_y), color, thickness)
+
+    cv2.line(img, (x2, y2), (x2, y2 - line_length_y), color, thickness)  #-- bottom-right
+    cv2.line(img, (x2, y2), (x2 - line_length_x, y2), color, thickness)
+
+    return img
 # Dilation and Erosion
 def thin_font(image):
     image = cv2.bitwise_not(image)
@@ -114,26 +119,35 @@ def sharpening_font(image):
     return sharpened
 
 def preprocess_image(image):
-    # Step 0: Resize image
+    # Resize image
     image = cv2.resize(image, (image.shape[1]*3, image.shape[0]*3))
+    # Convert to grayscale
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image = cv2.GaussianBlur(image, (5, 5), 0)
     
-    # Step 1: Convert to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Edge detection using Canny
+    # edges = cv2.Canny(blurred, 50, 150)
+
+    # Morphological operations (dilation and erosion)
+    kernel = np.ones((3, 3), np.uint8)
+    image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
+    # cv2.imshow("closed", closed)
     
-    # Step 2: Apply Gaussian blur
-    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    # Adaptive thresholding
+    image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
     
-    # Step 3: Edge detection using Canny
-    edges = cv2.Canny(blurred, 50, 150)
-    
-    # Step 4: Morphological operations (dilation and erosion)
-    # kernel = np.ones((3, 3), np.uint8)
-    # closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-    
-    # Step 5: Adaptive thresholding
-    thresh = cv2.adaptiveThreshold(edges, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 2)
-    
+    # Find contours in the image
+    contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Find the largest contour
+    largest_contour = max(contours, key=cv2.contourArea)
+
+    # Crop the image to the largest contour
+    x, y, w, h = cv2.boundingRect(largest_contour)
+    plate_image = image[y:y + h, x:x + w]
+    ret = thin_font(plate_image)
+    cv2.imshow("ret",ret)
     # Step 6: Find contours
     # contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    return thresh
+    return plate_image
