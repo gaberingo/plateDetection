@@ -7,7 +7,7 @@ def video_detection(cap:cv2.VideoCapture):
     
     mot_tracker = Sort()
 
-    model_detection = YOLO('./models/bestv4_n.pt')
+    model_detection = YOLO('./models/bestori_n.pt')
     names = model_detection.names
 
     ret = True
@@ -27,8 +27,8 @@ def video_detection(cap:cv2.VideoCapture):
                 x1,y1,x2,y2,conf,cls = detection
                 if names[int(cls)] == 'truck':
                     trucks.append([x1,y1,x2,y2,conf])
-                    
-            truck_ids = mot_tracker.update(np.array(trucks))
+            if len(trucks) > 0:
+                truck_ids = mot_tracker.update(np.asarray(trucks))
             
             # Deteksi Plat Nomor
             for plate in results.boxes.data.tolist():
@@ -51,24 +51,13 @@ def video_detection(cap:cv2.VideoCapture):
                         H, W, _ = crop_plate.shape
 
                         try:
-                            # frame[int(y1) - H - 100:int(y1) - 100, int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = crop_plate
-
-                            # frame[int(y1) - H - 400:int(y1) - H - 100, int((x2 + x1 - W) / 2):int((x2 + x1 + W) / 2), :] = (255, 255, 255)
-
-                            (text_width, text_height), _ = cv2.getTextSize(
-                                plate_text,
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                2,
-                                17)
-
                             cv2.putText(frame,
                                         plate_text,
-                                        (int((x2 + x1 - text_width) / 2), int(y1 - H - 250 + (text_height / 2))),
+                                        (int(x1-W), int(y1 - H)),
                                         cv2.FONT_HERSHEY_SIMPLEX,
                                         2,
-                                        (0, 0, 0),
+                                        (0, 0, 255),
                                         2)
-
                         except:
                             pass
                         
@@ -82,12 +71,12 @@ def video_detection(cap:cv2.VideoCapture):
                                     'confidence':conf,
                                     'text_confidence':plate_text_conf,}
                                 }
-                    cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 12)
+                    cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 3)
                 else:
                     frame = img_utils.draw_border(frame, (int(x1),int(y1)), (int(x2), int(y2)))
         else:
             break
-        frame = cv2.resize(frame, (640,480))
+        frame = cv2.resize(frame, (1280,720))
         cv2.imshow("Detection", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

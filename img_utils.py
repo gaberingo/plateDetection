@@ -120,13 +120,13 @@ def sharpening_font(image):
 
 def preprocess_image(image):
     # Resize image
-    image = cv2.resize(image, (image.shape[1]*3, image.shape[0]*3))
+    image = cv2.resize(image, (640, 480))
     # Convert to grayscale
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     image = cv2.GaussianBlur(image, (5, 5), 0)
     
     # Edge detection using Canny
-    # edges = cv2.Canny(blurred, 50, 150)
+    # image = cv2.Canny(image, 50, 150)
 
     # Morphological operations (dilation and erosion)
     kernel = np.ones((3, 3), np.uint8)
@@ -145,9 +145,5 @@ def preprocess_image(image):
     # Crop the image to the largest contour
     x, y, w, h = cv2.boundingRect(largest_contour)
     plate_image = image[y:y + h, x:x + w]
-    ret = thin_font(plate_image)
-    cv2.imshow("ret",ret)
-    # Step 6: Find contours
-    # contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     return plate_image
